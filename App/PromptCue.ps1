@@ -179,9 +179,13 @@ function Check-ForUpdate {
                 # Relaunch on the freshly-downloaded script and end this
                 # process, instead of leaving the old code running until the
                 # user manually closes and reopens - the update should take
-                # effect immediately, not on next launch.
+                # effect immediately, not on next launch. $selfPath can
+                # contain spaces (e.g. a OneDrive folder name), so it must be
+                # quoted inside a single argument string - passing it as its
+                # own element of an -ArgumentList array does NOT quote it and
+                # silently truncates the path at the first space.
                 Start-Process -FilePath "powershell.exe" `
-                    -ArgumentList @('-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', $selfPath) `
+                    -ArgumentList "-ExecutionPolicy Bypass -WindowStyle Hidden -File `"$selfPath`"" `
                     -WindowStyle Hidden
                 try { $form.Close() } catch { }
                 [System.Environment]::Exit(0)
