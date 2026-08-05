@@ -177,8 +177,7 @@ function Seed-ExampleProjectIfNone {
     $examplePrompts = @(
         "1. Open a chat window - or just Notepad, or any text editor - where you want to test this app.",
         "2. Press F2 to paste this next prompt into that window.",
-        "3. Press F3 to paste the previous prompt again.",
-        "4. Don't forget to minimize this app while demoing."
+        "3. Press F3 to paste the previous prompt again.`n# Note: Don't forget to minimize this app while demoing."
     )
     Save-ProjectFile -name "Example My Prompts" -prompts $examplePrompts -index 0
 }
@@ -237,26 +236,32 @@ $form.Controls.Add($lblProject)
 
 $cmbProject = New-Object System.Windows.Forms.ComboBox
 $cmbProject.Location = New-Object System.Drawing.Point(65, 9)
-$cmbProject.Size = New-Object System.Drawing.Size(220, 24)
+$cmbProject.Size = New-Object System.Drawing.Size(165, 24)
 $cmbProject.DropDownStyle = "DropDown"
 $form.Controls.Add($cmbProject)
+
+$btnNewProject = New-Object System.Windows.Forms.Button
+$btnNewProject.Text = "New"
+$btnNewProject.Location = New-Object System.Drawing.Point(235, 8)
+$btnNewProject.Size = New-Object System.Drawing.Size(50, 26)
+$form.Controls.Add($btnNewProject)
 
 $btnLoadProject = New-Object System.Windows.Forms.Button
 $btnLoadProject.Text = "Load"
 $btnLoadProject.Location = New-Object System.Drawing.Point(290, 8)
-$btnLoadProject.Size = New-Object System.Drawing.Size(60, 26)
+$btnLoadProject.Size = New-Object System.Drawing.Size(55, 26)
 $form.Controls.Add($btnLoadProject)
 
 $btnSaveProject = New-Object System.Windows.Forms.Button
 $btnSaveProject.Text = "Save"
-$btnSaveProject.Location = New-Object System.Drawing.Point(355, 8)
-$btnSaveProject.Size = New-Object System.Drawing.Size(60, 26)
+$btnSaveProject.Location = New-Object System.Drawing.Point(350, 8)
+$btnSaveProject.Size = New-Object System.Drawing.Size(55, 26)
 $form.Controls.Add($btnSaveProject)
 
 $btnDeleteProject = New-Object System.Windows.Forms.Button
 $btnDeleteProject.Text = "Delete"
-$btnDeleteProject.Location = New-Object System.Drawing.Point(420, 8)
-$btnDeleteProject.Size = New-Object System.Drawing.Size(60, 26)
+$btnDeleteProject.Location = New-Object System.Drawing.Point(410, 8)
+$btnDeleteProject.Size = New-Object System.Drawing.Size(55, 26)
 $form.Controls.Add($btnDeleteProject)
 
 $lnkGuide = New-Object System.Windows.Forms.LinkLabel
@@ -819,6 +824,20 @@ $btnBack.Add_Click({ Do-Back })
 $btnJump.Add_Click({ Do-Jump ([int]$numJump.Value) })
 $lnkAbout.Add_LinkClicked({ Show-AboutDialog })
 $lnkGuide.Add_LinkClicked({ Show-Walkthrough })
+
+$btnNewProject.Add_Click({
+    # Clears the working area for a fresh project. Purely in-memory - nothing
+    # is written to disk until the user names it and clicks Save.
+    $cmbProject.Text = ""
+    $txtInput.Text = ""
+    $txtPreview.Text = ""
+    $script:prompts = @()
+    $script:index = 0
+    $script:currentProject = $null
+    $lblStatus.Text = "Prompt 0 / 0"
+    Update-JumpRange
+    $cmbProject.Focus()
+})
 
 $btnLoadProject.Add_Click({
     $name = $cmbProject.Text.Trim()
