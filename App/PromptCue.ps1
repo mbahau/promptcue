@@ -130,7 +130,7 @@ $configPath = Join-Path $scriptDir "config.json"
 if (-not (Test-Path $projDir)) { New-Item -ItemType Directory -Path $projDir | Out-Null }
 
 # ---------- update check ----------
-$AppVersion = "1.2"
+$AppVersion = "1.3"
 $UpdateVersionUrl = "https://raw.githubusercontent.com/mbahau/promptcue/main/App/version.txt"
 $UpdateNotesUrl   = "https://raw.githubusercontent.com/mbahau/promptcue/main/App/release-notes.txt"
 $UpdateScriptUrl  = "https://raw.githubusercontent.com/mbahau/promptcue/main/App/PromptCue.ps1"

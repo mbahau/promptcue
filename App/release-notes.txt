@@ -1,3 +1,4 @@
-- Added an About page (developer contact, clickable/copyable email, GitHub repo link)
-- Added a first-run walkthrough guiding new users through creating, saving, and delivering prompts
-- The walkthrough can be reopened anytime via the new Guide link
+- Added a New project button
+- Walkthrough example now shows a multi-line paste
+- Simulated typing now stops cleanly if focus is lost mid-paste
+- Removed Paste Next/Prev buttons; cleaned up F2/F3 labeling and status text
