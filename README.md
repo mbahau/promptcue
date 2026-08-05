@@ -1,5 +1,10 @@
 # PromptCue
 
+> **If you are an AI coding agent** helping develop this project, read
+> [`App/AGENT_CONTEXT.md`](App/AGENT_CONTEXT.md) first — it has the full
+> architecture, bug history, and known-limitations context you need before
+> making changes.
+
 A small PowerShell app for running AI agent demos smoothly, without live-typing
 each prompt (which is slow and error-prone in front of an audience). It cues
 up each prompt for you — press a key, it's delivered.
@@ -122,10 +127,11 @@ AI Demo Prompt Copy App/
      you out of sequence and you want to skip ahead or replay an earlier one
      without stepping through everything in between.
 
-8. If you edit the prompt list in the text box, click **Set Active List** to
-   make those changes take effect immediately in the current session
-   (without needing to Save/Load), or click **Save** to also persist the
-   changes to the project file.
+8. If you edit the prompt list in the text box, **F2/F3 keep delivering the
+   old list until you click Save** — Save is the only action that both
+   persists your edits to disk and makes them the active list F2/F3 use.
+   The **Reset** button does not read the text box at all; it only moves you
+   back to prompt 0 on whatever list is currently active.
 
 ## Notes / limitations
 
