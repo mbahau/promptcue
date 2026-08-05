@@ -1,2 +1,1 @@
-- Update now auto-relaunches into the new version instead of requiring a manual restart
-- Reverted developer name in the About dialog
+- Fixed the self-update relaunch failing silently on install paths with spaces
