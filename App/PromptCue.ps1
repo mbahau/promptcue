@@ -124,7 +124,7 @@ if (-not (Test-Path $projDir)) { New-Item -ItemType Directory -Path $projDir | O
 # ---------- update check ----------
 $AppVersion = "1.0"
 $UpdateVersionUrl = "https://raw.githubusercontent.com/mbahau/promptcue/main/version.txt"
-$UpdateScriptUrl  = "https://raw.githubusercontent.com/mbahau/promptcue/main/PromptCue.ps1"
+$UpdateScriptUrl  = "https://raw.githubusercontent.com/mbahau/promptcue/main/App/PromptCue.ps1"
 
 function Check-ForUpdate {
     # Best-effort, silent on any failure (no internet, GitHub unreachable,
