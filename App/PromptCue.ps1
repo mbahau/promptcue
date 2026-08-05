@@ -175,9 +175,16 @@ function Check-ForUpdate {
             if ($resp -eq "Yes") {
                 $selfPath = $PSCommandPath
                 Invoke-WebRequest -Uri "$UpdateScriptUrl`?$cacheBuster" -OutFile $selfPath -UseBasicParsing -TimeoutSec 15
-                [System.Windows.Forms.MessageBox]::Show(
-                    "Updated to $remoteVersion. Close and reopen PromptCue to use the new version.",
-                    "PromptCue Update") | Out-Null
+
+                # Relaunch on the freshly-downloaded script and end this
+                # process, instead of leaving the old code running until the
+                # user manually closes and reopens - the update should take
+                # effect immediately, not on next launch.
+                Start-Process -FilePath "powershell.exe" `
+                    -ArgumentList @('-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', $selfPath) `
+                    -WindowStyle Hidden
+                try { $form.Close() } catch { }
+                [System.Environment]::Exit(0)
             }
         } elseif ($Manual) {
             [System.Windows.Forms.MessageBox]::Show(
