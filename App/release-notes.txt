@@ -1,3 +1,2 @@
-- Fixed the update check silently failing to detect new versions
-- Added a manual "Check for Update" button in the About dialog
-- Updated developer name in the About dialog
+- Update now auto-relaunches into the new version instead of requiring a manual restart
+- Reverted developer name in the About dialog
