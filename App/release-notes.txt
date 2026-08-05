@@ -1,0 +1,3 @@
+- Added an About page (developer contact, clickable/copyable email, GitHub repo link)
+- Added a first-run walkthrough guiding new users through creating, saving, and delivering prompts
+- The walkthrough can be reopened anytime via the new Guide link

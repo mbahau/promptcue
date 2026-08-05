@@ -147,20 +147,28 @@ Invoke-Pester -Path ".\Tests\PromptCue.Tests.ps1"
 
 ## Distribution & update mechanism
 
-- This repo (`App/PromptCue.ps1`, `README.md`, `Run PromptCue.vbs`,
-  `version.txt`) is the **distribution copy** — what an end user downloads
-  and runs standalone, anywhere on their PC. It intentionally mirrors the
-  same `App/` folder structure as the maintainer's local working copy.
-- `version.txt` at the repo root holds the current version string. The app
-  has a matching `$AppVersion` variable and a `Check-ForUpdate` function
-  that runs at startup: it fetches `version.txt` from this repo's raw GitHub
-  URL, and if it doesn't match `$AppVersion`, offers to download the latest
-  `App/PromptCue.ps1` over itself. This check is wrapped in try/catch and
-  fails silently (no internet, repo unreachable, etc.) — it must never block
-  the app from opening.
+- This repo is the **distribution copy** — what an end user downloads and
+  runs standalone, anywhere on their PC. The repo root intentionally stays
+  minimal (`README.md`, `Run PromptCue.vbs`, `App/`, `Tests/`) — anything
+  the running app itself needs to fetch (version, release notes) lives
+  under `App/`, not the repo root.
+- `App/version.txt` holds the current version string (matches the live
+  convention already used before this file moved under `App/`).
+  `App/release-notes.txt` is a plain-text, best-effort companion — one
+  bullet per line describing what changed. The app has a matching
+  `$AppVersion` variable and a `Check-ForUpdate` function that runs at
+  startup: it fetches `App/version.txt` from the repo's raw GitHub URL, and
+  if it doesn't match `$AppVersion`, shows an update prompt (also trying to
+  fetch `App/release-notes.txt` for a "What's new" section — if that fetch
+  fails, the plain version-only prompt still shows) before offering to
+  download the latest `App/PromptCue.ps1` over itself. This whole check is
+  wrapped in try/catch and fails silently (no internet, repo unreachable,
+  etc.) — it must never block the app from opening.
 - **To ship an update**: bump `$AppVersion` in `PromptCue.ps1`, bump
-  `version.txt` to match, commit, push. Keep those two version strings in
+  `App/version.txt` to match, update `App/release-notes.txt` to describe
+  what changed, commit, push. Keep `$AppVersion` and `App/version.txt` in
   sync — the check is a simple string inequality, not semver-aware.
 - No personal/user-specific data (`App/config.json`, `App/Projects/*.json`)
   is ever pushed here — those are per-user and stay local to whoever's
-  running the app.
+  running the app. Both are listed in `.gitignore`; if either shows up as
+  tracked in `git status`, that's a regression — `git rm --cached` it.

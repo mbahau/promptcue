@@ -127,8 +127,9 @@ $configPath = Join-Path $scriptDir "config.json"
 if (-not (Test-Path $projDir)) { New-Item -ItemType Directory -Path $projDir | Out-Null }
 
 # ---------- update check ----------
-$AppVersion = "1.1"
-$UpdateVersionUrl = "https://raw.githubusercontent.com/mbahau/promptcue/main/version.txt"
+$AppVersion = "1.2"
+$UpdateVersionUrl = "https://raw.githubusercontent.com/mbahau/promptcue/main/App/version.txt"
+$UpdateNotesUrl   = "https://raw.githubusercontent.com/mbahau/promptcue/main/App/release-notes.txt"
 $UpdateScriptUrl  = "https://raw.githubusercontent.com/mbahau/promptcue/main/App/PromptCue.ps1"
 
 function Check-ForUpdate {
@@ -137,8 +138,17 @@ function Check-ForUpdate {
     try {
         $remoteVersion = (Invoke-RestMethod -Uri $UpdateVersionUrl -TimeoutSec 5).Trim()
         if (Test-UpdateAvailable -CurrentVersion $AppVersion -RemoteVersion $remoteVersion) {
+            # Notes are a nice-to-have on top of the version check above - if
+            # release-notes.txt is missing or unreachable, still show the
+            # plain update prompt rather than skipping the update entirely.
+            $notesText = ""
+            try {
+                $notes = (Invoke-RestMethod -Uri $UpdateNotesUrl -TimeoutSec 5).Trim()
+                if ($notes) { $notesText = "`n`nWhat's new:`n$notes" }
+            } catch { }
+
             $resp = [System.Windows.Forms.MessageBox]::Show(
-                "An update is available ($AppVersion -> $remoteVersion). Update now?",
+                "A new version of PromptCue is available ($AppVersion -> $remoteVersion).$notesText`n`nUpdate now?",
                 "PromptCue Update", "YesNo")
             if ($resp -eq "Yes") {
                 $selfPath = $PSCommandPath
@@ -162,15 +172,40 @@ function Get-ProjectNames {
 
 # Save-ProjectFile / Load-ProjectFile now live in PromptCue.Logic.ps1 (dot-sourced above).
 
+# Config is a flat key/value file (LastProject, WalkthroughShown, ...). Reads
+# merge onto a fresh hashtable and writes go through the same merge so one
+# setter (e.g. Save-LastProject) never clobbers a key another setter wrote.
+function Get-ConfigTable {
+    $table = @{}
+    if (Test-Path $configPath) {
+        try {
+            $json = Get-Content -Path $configPath -Raw | ConvertFrom-Json
+            $json.PSObject.Properties | ForEach-Object { $table[$_.Name] = $_.Value }
+        } catch { }
+    }
+    return $table
+}
+
+function Set-ConfigValue([string]$key, $value) {
+    $table = Get-ConfigTable
+    $table[$key] = $value
+    $table | ConvertTo-Json | Set-Content -Path $configPath -Encoding UTF8
+}
+
 function Save-LastProject([string]$name) {
-    @{ LastProject = $name } | ConvertTo-Json | Set-Content -Path $configPath -Encoding UTF8
+    Set-ConfigValue -key "LastProject" -value $name
 }
 
 function Get-LastProject {
-    if (Test-Path $configPath) {
-        try { return (Get-Content -Path $configPath -Raw | ConvertFrom-Json).LastProject } catch { return $null }
-    }
-    return $null
+    (Get-ConfigTable)["LastProject"]
+}
+
+function Get-WalkthroughShown {
+    [bool](Get-ConfigTable)["WalkthroughShown"]
+}
+
+function Save-WalkthroughShown {
+    Set-ConfigValue -key "WalkthroughShown" -value $true
 }
 
 # ---------- UI ----------
@@ -210,6 +245,22 @@ $btnDeleteProject.Text = "Delete"
 $btnDeleteProject.Location = New-Object System.Drawing.Point(420, 8)
 $btnDeleteProject.Size = New-Object System.Drawing.Size(60, 26)
 $form.Controls.Add($btnDeleteProject)
+
+$lnkGuide = New-Object System.Windows.Forms.LinkLabel
+$lnkGuide.Text = "Guide"
+$lnkGuide.Location = New-Object System.Drawing.Point(500, 6)
+$lnkGuide.Size = New-Object System.Drawing.Size(65, 14)
+$lnkGuide.TextAlign = [System.Drawing.ContentAlignment]::MiddleRight
+$lnkGuide.Anchor = "Top, Right"
+$form.Controls.Add($lnkGuide)
+
+$lnkAbout = New-Object System.Windows.Forms.LinkLabel
+$lnkAbout.Text = "About"
+$lnkAbout.Location = New-Object System.Drawing.Point(500, 21)
+$lnkAbout.Size = New-Object System.Drawing.Size(65, 14)
+$lnkAbout.TextAlign = [System.Drawing.ContentAlignment]::MiddleRight
+$lnkAbout.Anchor = "Top, Right"
+$form.Controls.Add($lnkAbout)
 
 $lblInput = New-Object System.Windows.Forms.Label
 $lblInput.Text = "Prompts (multi-line OK - put --- on its own line between prompts):"
@@ -550,11 +601,211 @@ function Do-Back {
     Persist-Progress
 }
 
+function Show-Walkthrough {
+    # $script:wtIndex / $script:wtSteps so the inline Add_Click handlers below
+    # (nested script blocks, not named functions) reliably see live state -
+    # this file's convention elsewhere is $script: for exactly this reason.
+    $script:wtIndex = 0
+    $script:wtSteps = @(
+        @{ Title = "Welcome to PromptCue"
+           Body  = "PromptCue delivers a list of prepared prompts into another app's chat box, one at a time, so you don't have to copy and paste each one by hand. This quick guide covers the basics." },
+        @{ Title = "Step 1: Enter your prompts"
+           Body  = "Type or paste your prompts into the big text box. If you have more than one, put a line containing only ---`nbetween each prompt, on its own line." },
+        @{ Title = "Step 2: Save your project"
+           Body  = "Type a name in the Project box at the top, then click Save. This stores your prompt list so you can reload it later, and remembers your progress." },
+        @{ Title = "Step 3: Click into the target chat box"
+           Body  = "Before pressing F2 or F3, click once into the text box of the app you want the prompts delivered to (e.g. the o9 chat window), so it has keyboard focus." },
+        @{ Title = "Step 4: Deliver prompts with F2 / F3"
+           Body  = "Press F2 (or Paste Next) to deliver the next prompt into that focused box. Press F3 (or Paste Prev) to redeliver the previous one. Use Jump to # to reposition without sending anything, and Reset to start over. Progress auto-saves." }
+    )
+
+    $dlg = New-Object System.Windows.Forms.Form
+    $dlg.Text = "PromptCue Walkthrough"
+    $dlg.Size = New-Object System.Drawing.Size(440, 320)
+    $dlg.FormBorderStyle = "FixedDialog"
+    $dlg.MaximizeBox = $false
+    $dlg.MinimizeBox = $false
+    $dlg.StartPosition = "CenterParent"
+
+    $lblStep = New-Object System.Windows.Forms.Label
+    $lblStep.Font = New-Object System.Drawing.Font("Segoe UI", 8, [System.Drawing.FontStyle]::Italic)
+    $lblStep.ForeColor = [System.Drawing.Color]::Gray
+    $lblStep.Location = New-Object System.Drawing.Point(15, 15)
+    $lblStep.Size = New-Object System.Drawing.Size(200, 18)
+    $dlg.Controls.Add($lblStep)
+
+    $lblTitle = New-Object System.Windows.Forms.Label
+    $lblTitle.Font = New-Object System.Drawing.Font("Segoe UI", 11, [System.Drawing.FontStyle]::Bold)
+    $lblTitle.Location = New-Object System.Drawing.Point(15, 35)
+    $lblTitle.Size = New-Object System.Drawing.Size(395, 26)
+    $dlg.Controls.Add($lblTitle)
+
+    $lblBody = New-Object System.Windows.Forms.Label
+    $lblBody.Location = New-Object System.Drawing.Point(15, 70)
+    $lblBody.Size = New-Object System.Drawing.Size(395, 150)
+    $dlg.Controls.Add($lblBody)
+
+    $btnSkip = New-Object System.Windows.Forms.Button
+    $btnSkip.Text = "Skip"
+    $btnSkip.Location = New-Object System.Drawing.Point(15, 240)
+    $btnSkip.Size = New-Object System.Drawing.Size(75, 28)
+    $dlg.Controls.Add($btnSkip)
+
+    $btnBack = New-Object System.Windows.Forms.Button
+    $btnBack.Text = "Back"
+    $btnBack.Location = New-Object System.Drawing.Point(255, 240)
+    $btnBack.Size = New-Object System.Drawing.Size(75, 28)
+    $dlg.Controls.Add($btnBack)
+
+    $btnNextStep = New-Object System.Windows.Forms.Button
+    $btnNextStep.Location = New-Object System.Drawing.Point(335, 240)
+    $btnNextStep.Size = New-Object System.Drawing.Size(75, 28)
+    $dlg.Controls.Add($btnNextStep)
+    $dlg.AcceptButton = $btnNextStep
+
+    $script:wtRender = {
+        $step = $script:wtSteps[$script:wtIndex]
+        $lblStep.Text = "Step $($script:wtIndex + 1) of $($script:wtSteps.Count)"
+        $lblTitle.Text = $step.Title
+        $lblBody.Text = $step.Body
+        $btnBack.Enabled = ($script:wtIndex -gt 0)
+        $btnNextStep.Text = if ($script:wtIndex -eq $script:wtSteps.Count - 1) { "Finish" } else { "Next" }
+    }
+
+    $btnBack.Add_Click({
+        if ($script:wtIndex -gt 0) { $script:wtIndex--; & $script:wtRender }
+    })
+    $btnNextStep.Add_Click({
+        if ($script:wtIndex -lt $script:wtSteps.Count - 1) { $script:wtIndex++; & $script:wtRender }
+        else { $dlg.Close() }
+    })
+    $btnSkip.Add_Click({ $dlg.Close() })
+
+    & $script:wtRender
+    [void]$dlg.ShowDialog($form)
+}
+
+function Show-AboutDialog {
+    $DevEmail = "md.bahauddin@o9solutions.com"
+    $RepoUrl  = "https://github.com/mbahau/promptcue/"
+
+    $dlg = New-Object System.Windows.Forms.Form
+    $dlg.Text = "About PromptCue"
+    $dlg.Size = New-Object System.Drawing.Size(470, 560)
+    $dlg.FormBorderStyle = "FixedDialog"
+    $dlg.MaximizeBox = $false
+    $dlg.MinimizeBox = $false
+    $dlg.StartPosition = "CenterParent"
+
+    $lblApp = New-Object System.Windows.Forms.Label
+    $lblApp.Text = "PromptCue v$AppVersion"
+    $lblApp.Font = New-Object System.Drawing.Font("Segoe UI", 12, [System.Drawing.FontStyle]::Bold)
+    $lblApp.Location = New-Object System.Drawing.Point(15, 15)
+    $lblApp.Size = New-Object System.Drawing.Size(420, 26)
+    $dlg.Controls.Add($lblApp)
+
+    $lblDesc = New-Object System.Windows.Forms.Label
+    $lblDesc.Text = "PromptCue delivers a prepared list of prompts one at a time into " +
+        "another app's text box (e.g. an AI chat window), either by pasting or " +
+        "by simulating human-like typing, so you don't have to manually " +
+        "copy and paste each prompt yourself."
+    $lblDesc.Location = New-Object System.Drawing.Point(15, 45)
+    $lblDesc.Size = New-Object System.Drawing.Size(420, 60)
+    $dlg.Controls.Add($lblDesc)
+
+    $lblHowToTitle = New-Object System.Windows.Forms.Label
+    $lblHowToTitle.Text = "How to use:"
+    $lblHowToTitle.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+    $lblHowToTitle.Location = New-Object System.Drawing.Point(15, 110)
+    $lblHowToTitle.Size = New-Object System.Drawing.Size(200, 20)
+    $dlg.Controls.Add($lblHowToTitle)
+
+    $lblHowTo = New-Object System.Windows.Forms.Label
+    $lblHowTo.Text =
+        "1. Paste your prompts into the box, one per block, separated by`n" +
+        "    a line containing only ---.`n" +
+        "2. Click Save to store them under a project name.`n" +
+        "3. Click once into the target chat box (e.g. the o9 chat).`n" +
+        "4. Press F2 (Paste Next) to deliver the next prompt, or F3`n" +
+        "    (Paste Prev) to redeliver the previous one.`n" +
+        "5. Use Jump to # to reposition without sending anything, and`n" +
+        "    Reset to start the current list over from the beginning."
+    $lblHowTo.Location = New-Object System.Drawing.Point(15, 132)
+    $lblHowTo.Size = New-Object System.Drawing.Size(420, 150)
+    $dlg.Controls.Add($lblHowTo)
+
+    $lblDev = New-Object System.Windows.Forms.Label
+    $lblDev.Text = "Developer: MD Bahauddin"
+    $lblDev.Location = New-Object System.Drawing.Point(15, 292)
+    $lblDev.Size = New-Object System.Drawing.Size(420, 20)
+    $dlg.Controls.Add($lblDev)
+
+    $lblEmailCaption = New-Object System.Windows.Forms.Label
+    $lblEmailCaption.Text = "Email:"
+    $lblEmailCaption.Location = New-Object System.Drawing.Point(15, 322)
+    $lblEmailCaption.Size = New-Object System.Drawing.Size(45, 20)
+    $dlg.Controls.Add($lblEmailCaption)
+
+    $lnkEmail = New-Object System.Windows.Forms.LinkLabel
+    $lnkEmail.Text = $DevEmail
+    $lnkEmail.Location = New-Object System.Drawing.Point(60, 322)
+    $lnkEmail.Size = New-Object System.Drawing.Size(280, 20)
+    $lnkEmail.Add_LinkClicked({ Start-Process "mailto:$DevEmail" })
+    $dlg.Controls.Add($lnkEmail)
+
+    $btnCopyEmail = New-Object System.Windows.Forms.Button
+    $btnCopyEmail.Text = "Copy"
+    $btnCopyEmail.Location = New-Object System.Drawing.Point(350, 319)
+    $btnCopyEmail.Size = New-Object System.Drawing.Size(65, 24)
+    $btnCopyEmail.Add_Click({
+        [System.Windows.Forms.Clipboard]::SetText($DevEmail)
+        $btnCopyEmail.Text = "Copied!"
+        $copyTimer = New-Object System.Windows.Forms.Timer
+        $copyTimer.Interval = 1200
+        $copyTimer.Add_Tick({ $btnCopyEmail.Text = "Copy"; $copyTimer.Stop(); $copyTimer.Dispose() })
+        $copyTimer.Start()
+    })
+    $dlg.Controls.Add($btnCopyEmail)
+
+    $lblRepoCaption = New-Object System.Windows.Forms.Label
+    $lblRepoCaption.Text = "Repository:"
+    $lblRepoCaption.Location = New-Object System.Drawing.Point(15, 357)
+    $lblRepoCaption.Size = New-Object System.Drawing.Size(80, 20)
+    $dlg.Controls.Add($lblRepoCaption)
+
+    $lnkRepo = New-Object System.Windows.Forms.LinkLabel
+    $lnkRepo.Text = $RepoUrl
+    $lnkRepo.Location = New-Object System.Drawing.Point(15, 379)
+    $lnkRepo.Size = New-Object System.Drawing.Size(420, 20)
+    $lnkRepo.Add_LinkClicked({ Start-Process $RepoUrl })
+    $dlg.Controls.Add($lnkRepo)
+
+    $lblContrib = New-Object System.Windows.Forms.Label
+    $lblContrib.Text = "PromptCue is open source - contributions are welcome via pull request."
+    $lblContrib.Location = New-Object System.Drawing.Point(15, 405)
+    $lblContrib.Size = New-Object System.Drawing.Size(420, 32)
+    $lblContrib.Font = New-Object System.Drawing.Font("Segoe UI", 8, [System.Drawing.FontStyle]::Italic)
+    $lblContrib.ForeColor = [System.Drawing.Color]::Gray
+    $dlg.Controls.Add($lblContrib)
+
+    $btnClose = New-Object System.Windows.Forms.Button
+    $btnClose.Text = "Close"
+    $btnClose.Location = New-Object System.Drawing.Point(360, 445)
+    $btnClose.Size = New-Object System.Drawing.Size(80, 28)
+    $btnClose.DialogResult = "OK"
+    $dlg.Controls.Add($btnClose)
+    $dlg.AcceptButton = $btnClose
+
+    [void]$dlg.ShowDialog($form)
+}
+
 # ---------- events ----------
 $btnStart.Add_Click({ Do-Reset })
 $btnNext.Add_Click({ Do-Next })
 $btnBack.Add_Click({ Do-Back })
 $btnJump.Add_Click({ Do-Jump ([int]$numJump.Value) })
+$lnkAbout.Add_LinkClicked({ Show-AboutDialog })
+$lnkGuide.Add_LinkClicked({ Show-Walkthrough })
 
 $btnLoadProject.Add_Click({
     $name = $cmbProject.Text.Trim()
@@ -618,6 +869,11 @@ $form.Add_Load({
     $last = Get-LastProject
     if ($last -and (Get-ProjectNames) -contains $last) {
         Load-SelectedProject -name $last
+    }
+
+    if (-not (Get-WalkthroughShown)) {
+        Save-WalkthroughShown
+        Show-Walkthrough
     }
 })
 
