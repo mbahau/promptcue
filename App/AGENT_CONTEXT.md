@@ -129,12 +129,21 @@ guards the blank-line bug above), `Save-ProjectFile`/`Load-ProjectFile`
 Invoke-Pester -Path ".\Tests\PromptCue.Tests.ps1"
 ```
 
-**Any change to a function in `PromptCue.Logic.ps1` must be followed by
-running this suite before considering the change done.** It does not and
-cannot cover the WinForms/hotkey/simulated-typing layer in `PromptCue.ps1`
-— that still needs manual verification in the running app, per "Known
-limitations" above. If you add a new pure function there, add tests for it
-in the same file rather than starting a second test file.
+**Scope of when to run this — narrow, not automatic:**
+- Run it when you've actually edited a function inside `PromptCue.Logic.ps1`
+  (or added a new one there), as the last step before considering *that*
+  change finished.
+- Do not run it, and do not treat it as a gate, for changes that don't touch
+  `PromptCue.Logic.ps1` — GUI layout tweaks, button labels, `PromptCue.ps1`
+  event-handler logic, README/doc edits, version bumps, and general Q&A all
+  fall outside this. Testing is not something to proactively insert into
+  unrelated work or run "just in case."
+- It does not and cannot cover the WinForms/hotkey/simulated-typing layer in
+  `PromptCue.ps1` — that still needs manual verification in the running app,
+  per "Known limitations" above, and only when the user is actually
+  finalizing/testing that behavior, not on every edit.
+- If you add a new pure function to `PromptCue.Logic.ps1`, add its tests to
+  this same file rather than starting a second test file.
 
 ## Distribution & update mechanism
 
