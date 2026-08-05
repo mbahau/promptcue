@@ -14,8 +14,16 @@ one. The app window itself never needs focus during the actual demo.
 
 ## Architecture
 
-- Single script: `App/PromptCue.ps1`. No external dependencies beyond
-  built-in .NET (`System.Windows.Forms`, `System.Drawing`).
+- Two script files: `App/PromptCue.ps1` (GUI, hotkeys, simulated typing) and
+  `App/PromptCue.Logic.ps1` (pure logic only — no WinForms/hotkey/SendInput
+  references allowed in this file). `PromptCue.ps1` dot-sources the logic
+  file at the very top: `. (Join-Path $PSScriptRoot "PromptCue.Logic.ps1")`.
+  This split exists purely so the logic file can be unit-tested headlessly —
+  see "Tests" below. If you add a new pure function (no GUI/hotkey/keystroke
+  dependency), put it in `PromptCue.Logic.ps1`, not the main script.
+- No external dependencies beyond built-in .NET (`System.Windows.Forms`,
+  `System.Drawing`) and, for tests, Pester (ships built-in with Windows
+  PowerShell 5.1 as v3.4.0 — do not assume Pester 5.x syntax).
 - A C# type (`HotkeyForm`, defined via `Add-Type` at the top of the script)
   subclasses `Form` to P/Invoke `RegisterHotKey`/`UnregisterHotKey` and
   override `WndProc` to catch `WM_HOTKEY` — this is what makes F2/F3 global
@@ -107,6 +115,26 @@ explicitly rejected.
   launch). If behavior seems "not updated" after a code change, check for
   and close duplicate PromptCue windows/processes before assuming a code
   bug.
+
+## Tests
+
+`Tests/PromptCue.Tests.ps1` (Pester 3.4 syntax — `Should Be`, not
+`Should -Be`) covers the pure logic in `PromptCue.Logic.ps1`:
+`Split-PromptBlocks` (including an explicit round-trip idempotency test that
+guards the blank-line bug above), `Save-ProjectFile`/`Load-ProjectFile`
+(round-trip via `-ProjDir` pointed at `$TestDrive`, not the real
+`App/Projects/`), and `Test-UpdateAvailable`. Run with:
+
+```
+Invoke-Pester -Path ".\Tests\PromptCue.Tests.ps1"
+```
+
+**Any change to a function in `PromptCue.Logic.ps1` must be followed by
+running this suite before considering the change done.** It does not and
+cannot cover the WinForms/hotkey/simulated-typing layer in `PromptCue.ps1`
+— that still needs manual verification in the running app, per "Known
+limitations" above. If you add a new pure function there, add tests for it
+in the same file rather than starting a second test file.
 
 ## Distribution & update mechanism
 

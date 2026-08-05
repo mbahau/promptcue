@@ -1,6 +1,11 @@
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
+# Pure logic (prompt splitting, project file I/O, version comparison) lives in
+# a separate file so it can be unit-tested without the GUI - see
+# Tests/PromptCue.Tests.ps1 and App/AGENT_CONTEXT.md.
+. (Join-Path $PSScriptRoot "PromptCue.Logic.ps1")
+
 # A Form subclass that can register a system-wide (global) hotkey.
 # Global means it fires even when a different window (e.g. the o9 chat) has focus.
 Add-Type -TypeDefinition @"
@@ -122,7 +127,7 @@ $configPath = Join-Path $scriptDir "config.json"
 if (-not (Test-Path $projDir)) { New-Item -ItemType Directory -Path $projDir | Out-Null }
 
 # ---------- update check ----------
-$AppVersion = "1.0"
+$AppVersion = "1.1"
 $UpdateVersionUrl = "https://raw.githubusercontent.com/mbahau/promptcue/main/version.txt"
 $UpdateScriptUrl  = "https://raw.githubusercontent.com/mbahau/promptcue/main/App/PromptCue.ps1"
 
@@ -131,7 +136,7 @@ function Check-ForUpdate {
     # etc.) - an update check must never block the app from opening.
     try {
         $remoteVersion = (Invoke-RestMethod -Uri $UpdateVersionUrl -TimeoutSec 5).Trim()
-        if ($remoteVersion -and $remoteVersion -ne $AppVersion) {
+        if (Test-UpdateAvailable -CurrentVersion $AppVersion -RemoteVersion $remoteVersion) {
             $resp = [System.Windows.Forms.MessageBox]::Show(
                 "An update is available ($AppVersion -> $remoteVersion). Update now?",
                 "PromptCue Update", "YesNo")
@@ -155,20 +160,7 @@ function Get-ProjectNames {
         ForEach-Object { $_.BaseName } | Sort-Object
 }
 
-function Save-ProjectFile([string]$name, [string[]]$prompts, [int]$index) {
-    if ([string]::IsNullOrWhiteSpace($name)) { return }
-    $safeName = ($name -replace '[\\/:*?"<>|]', '_')
-    $path = Join-Path $projDir "$safeName.json"
-    $obj = @{ Prompts = @($prompts); Index = $index }
-    $obj | ConvertTo-Json -Depth 5 | Set-Content -Path $path -Encoding UTF8
-}
-
-function Load-ProjectFile([string]$name) {
-    $safeName = ($name -replace '[\\/:*?"<>|]', '_')
-    $path = Join-Path $projDir "$safeName.json"
-    if (-not (Test-Path $path)) { return $null }
-    Get-Content -Path $path -Raw | ConvertFrom-Json
-}
+# Save-ProjectFile / Load-ProjectFile now live in PromptCue.Logic.ps1 (dot-sourced above).
 
 function Save-LastProject([string]$name) {
     @{ LastProject = $name } | ConvertTo-Json | Set-Content -Path $configPath -Encoding UTF8
@@ -365,29 +357,7 @@ function Update-JumpRange {
     if ($numJump.Value -gt $numJump.Maximum) { $numJump.Value = $numJump.Maximum }
 }
 
-function Split-PromptBlocks([string]$text) {
-    # Prompts are separated by a line containing only "---". Split line-by-line
-    # so the delimiter line is consumed exactly, with no ambiguity about which
-    # side of it a newline belongs to. (The previous regex-split approach left
-    # the newline next to the delimiter attached to a block; on the next
-    # Load->display->Save round trip that stray newline plus the newline added
-    # by re-joining with "---" would double up, so blank lines silently grew
-    # by one on each save/load cycle - this version is round-trip idempotent.)
-    $normalized = $text -replace "`r`n", "`n" -replace "`r", "`n"
-    $lines = $normalized -split "`n"
-    $blocks = New-Object System.Collections.Generic.List[string]
-    $current = New-Object System.Collections.Generic.List[string]
-    foreach ($line in $lines) {
-        if ($line -match '^[ \t]*---[ \t]*$') {
-            $blocks.Add(($current -join "`n"))
-            $current = New-Object System.Collections.Generic.List[string]
-        } else {
-            $current.Add($line)
-        }
-    }
-    $blocks.Add(($current -join "`n"))
-    $blocks | Where-Object { $_.Trim() -ne "" }
-}
+# Split-PromptBlocks now lives in PromptCue.Logic.ps1 (dot-sourced above).
 
 function Reparse-PromptsKeepPosition {
     # The only place $script:prompts (what F2/F3 actually deliver) gets
