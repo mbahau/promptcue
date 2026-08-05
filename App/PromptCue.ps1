@@ -7,7 +7,7 @@ Add-Type -AssemblyName System.Drawing
 . (Join-Path $PSScriptRoot "PromptCue.Logic.ps1")
 
 # A Form subclass that can register a system-wide (global) hotkey.
-# Global means it fires even when a different window (e.g. the o9 chat) has focus.
+# Global means it fires even when a different window (e.g. a chat app) has focus.
 Add-Type -TypeDefinition @"
 using System;
 using System.Windows.Forms;
@@ -326,7 +326,7 @@ $btnBack.Anchor = "Bottom, Left"
 $form.Controls.Add($btnBack)
 
 $lblHint = New-Object System.Windows.Forms.Label
-$lblHint.Text = "Click into the o9 chat box once. Then F2 = paste next prompt`nthere, F3 = paste previous prompt again. Progress auto-saves."
+$lblHint.Text = "Click into the target chat box once. Then F2 = paste next prompt`nthere, F3 = paste previous prompt again. Progress auto-saves."
 $lblHint.Location = New-Object System.Drawing.Point(330, 500)
 $lblHint.Size = New-Object System.Drawing.Size(250, 50)
 $lblHint.Font = New-Object System.Drawing.Font("Segoe UI", 8, [System.Drawing.FontStyle]::Italic)
@@ -456,7 +456,7 @@ function Load-SelectedProject([string]$name) {
 
 function Paste-Text($text) {
     # Puts the text on the clipboard, then sends Ctrl+V to whichever window
-    # currently has focus (the o9 chat box), without stealing focus ourselves.
+    # currently has focus (the target chat box), without stealing focus ourselves.
     [System.Windows.Forms.Clipboard]::SetText($text)
     Start-Sleep -Milliseconds 80
     [System.Windows.Forms.SendKeys]::SendWait("^v")
@@ -614,7 +614,7 @@ function Show-Walkthrough {
         @{ Title = "Step 2: Save your project"
            Body  = "Type a name in the Project box at the top, then click Save. This stores your prompt list so you can reload it later, and remembers your progress." },
         @{ Title = "Step 3: Click into the target chat box"
-           Body  = "Before pressing F2 or F3, click once into the text box of the app you want the prompts delivered to (e.g. the o9 chat window), so it has keyboard focus." },
+           Body  = "Before pressing F2 or F3, click once into the text box of the app you want the prompts delivered to (e.g. a chat window), so it has keyboard focus." },
         @{ Title = "Step 4: Deliver prompts with F2 / F3"
            Body  = "Press F2 (or Paste Next) to deliver the next prompt into that focused box. Press F3 (or Paste Prev) to redeliver the previous one. Use Jump to # to reposition without sending anything, and Reset to start over. Progress auto-saves." }
     )
@@ -725,7 +725,7 @@ function Show-AboutDialog {
         "1. Paste your prompts into the box, one per block, separated by`n" +
         "    a line containing only ---.`n" +
         "2. Click Save to store them under a project name.`n" +
-        "3. Click once into the target chat box (e.g. the o9 chat).`n" +
+        "3. Click once into the target chat box (e.g. your AI chat app).`n" +
         "4. Press F2 (Paste Next) to deliver the next prompt, or F3`n" +
         "    (Paste Prev) to redeliver the previous one.`n" +
         "5. Use Jump to # to reposition without sending anything, and`n" +
