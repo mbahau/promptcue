@@ -1,6 +1,12 @@
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
+# Show the "app is starting" cursor while the rest of this script (C# compile,
+# update check, form setup) runs with no window on screen yet - launching via
+# Run PromptCue.vbs hides the console, so Windows' own launch-spinner heuristic
+# never kicks in. Reset to Default right before the form is shown.
+[System.Windows.Forms.Cursor]::Current = [System.Windows.Forms.Cursors]::AppStarting
+
 # Pure logic (prompt splitting, project file I/O, version comparison) lives in
 # a separate file so it can be unit-tested without the GUI - see
 # Tests/PromptCue.Tests.ps1 and App/AGENT_CONTEXT.md.
@@ -136,17 +142,23 @@ $UpdateNotesUrl   = "https://raw.githubusercontent.com/mbahau/promptcue/main/App
 $UpdateScriptUrl  = "https://raw.githubusercontent.com/mbahau/promptcue/main/App/PromptCue.ps1"
 
 function Check-ForUpdate {
-    # Best-effort, silent on any failure (no internet, GitHub unreachable,
-    # etc.) - an update check must never block the app from opening.
+    param([switch]$Manual)
+    # Best-effort. On the automatic startup check, silent on any failure (no
+    # internet, GitHub unreachable, etc.) - it must never block the app from
+    # opening. On a manual check (button in About), report the outcome either
+    # way so it doesn't look like the click did nothing.
     try {
-        $remoteVersion = (Invoke-RestMethod -Uri $UpdateVersionUrl -TimeoutSec 5).Trim()
+        # Invoke-RestMethod parses a bare numeric body like "1.3" as a
+        # [decimal] instead of a string (it's valid JSON), which breaks
+        # .Trim() below - force to [string] first.
+        $remoteVersion = ([string](Invoke-RestMethod -Uri $UpdateVersionUrl -TimeoutSec 5)).Trim()
         if (Test-UpdateAvailable -CurrentVersion $AppVersion -RemoteVersion $remoteVersion) {
             # Notes are a nice-to-have on top of the version check above - if
             # release-notes.txt is missing or unreachable, still show the
             # plain update prompt rather than skipping the update entirely.
             $notesText = ""
             try {
-                $notes = (Invoke-RestMethod -Uri $UpdateNotesUrl -TimeoutSec 5).Trim()
+                $notes = ([string](Invoke-RestMethod -Uri $UpdateNotesUrl -TimeoutSec 5)).Trim()
                 if ($notes) { $notesText = "`n`nWhat's new:`n$notes" }
             } catch { }
 
@@ -160,9 +172,17 @@ function Check-ForUpdate {
                     "Updated to $remoteVersion. Close and reopen PromptCue to use the new version.",
                     "PromptCue Update") | Out-Null
             }
+        } elseif ($Manual) {
+            [System.Windows.Forms.MessageBox]::Show(
+                "You're on the latest version (v$AppVersion).",
+                "PromptCue Update") | Out-Null
         }
     } catch {
-        # No internet / repo unreachable / etc. - ignore and continue.
+        if ($Manual) {
+            [System.Windows.Forms.MessageBox]::Show(
+                "Couldn't check for updates: $($_.Exception.Message)",
+                "PromptCue Update") | Out-Null
+        }
     }
 }
 
@@ -841,6 +861,13 @@ function Show-AboutDialog {
     $lblContrib.ForeColor = [System.Drawing.Color]::Gray
     $dlg.Controls.Add($lblContrib)
 
+    $btnCheckUpdate = New-Object System.Windows.Forms.Button
+    $btnCheckUpdate.Text = "Check for Update"
+    $btnCheckUpdate.Location = New-Object System.Drawing.Point(15, 445)
+    $btnCheckUpdate.Size = New-Object System.Drawing.Size(140, 28)
+    $btnCheckUpdate.Add_Click({ Check-ForUpdate -Manual })
+    $dlg.Controls.Add($btnCheckUpdate)
+
     $btnClose = New-Object System.Windows.Forms.Button
     $btnClose.Text = "Close"
     $btnClose.Location = New-Object System.Drawing.Point(360, 445)
@@ -951,4 +978,5 @@ $form.Add_FormClosing({
     [void][HotkeyForm]::UnregisterHotKey($form.Handle, 2)
 })
 
+[System.Windows.Forms.Cursor]::Current = [System.Windows.Forms.Cursors]::Default
 [void]$form.ShowDialog()
