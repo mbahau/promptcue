@@ -1,4 +1,3 @@
-- Added a New project button
-- Walkthrough example now shows a multi-line paste
-- Simulated typing now stops cleanly if focus is lost mid-paste
-- Removed Paste Next/Prev buttons; cleaned up F2/F3 labeling and status text
+- Fixed the update check silently failing to detect new versions
+- Added a manual "Check for Update" button in the About dialog
+- Updated developer name in the About dialog
