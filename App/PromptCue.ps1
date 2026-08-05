@@ -170,6 +170,18 @@ function Get-ProjectNames {
         ForEach-Object { $_.BaseName } | Sort-Object
 }
 
+function Seed-ExampleProjectIfNone {
+    # Only seeds on a genuinely fresh install (no project files yet at all) -
+    # never overwrites or competes with anything the user has already saved.
+    if ((Get-ProjectNames).Count -gt 0) { return }
+    $examplePrompts = @(
+        "1. Hi! Can you introduce yourself and tell me what you can help with today?",
+        "2. Great, thanks. Now here's some background:`nWe're planning a product launch next quarter.`nPlease outline a rough timeline with 3 milestones.",
+        "3. Can you turn that into a short summary email I could send to my team?"
+    )
+    Save-ProjectFile -name "Example My Prompts" -prompts $examplePrompts -index 0
+}
+
 # Save-ProjectFile / Load-ProjectFile now live in PromptCue.Logic.ps1 (dot-sourced above).
 
 # Config is a flat key/value file (LastProject, WalkthroughShown, ...). Reads
@@ -865,8 +877,12 @@ $form.Add_Load({
     [void][HotkeyForm]::RegisterHotKey($form.Handle, 1, 0, $VK_F2)
     [void][HotkeyForm]::RegisterHotKey($form.Handle, 2, 0, $VK_F3)
 
+    Seed-ExampleProjectIfNone
     Refresh-ProjectList
     $last = Get-LastProject
+    if (-not $last -and (Get-ProjectNames) -contains "Example My Prompts") {
+        $last = "Example My Prompts"
+    }
     if ($last -and (Get-ProjectNames) -contains $last) {
         Load-SelectedProject -name $last
     }
