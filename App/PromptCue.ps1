@@ -308,10 +308,10 @@ $form.Controls.Add($btnStart)
 
 $lblStatus = New-Object System.Windows.Forms.Label
 $lblStatus.Text = "Prompt 0 / 0"
-$lblStatus.Location = New-Object System.Drawing.Point(180, 330)
-$lblStatus.Size = New-Object System.Drawing.Size(200, 20)
+$lblStatus.Location = New-Object System.Drawing.Point(180, 328)
+$lblStatus.Size = New-Object System.Drawing.Size(390, 40)
 $lblStatus.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
-$lblStatus.Anchor = "Bottom, Left"
+$lblStatus.Anchor = "Bottom, Left, Right"
 $form.Controls.Add($lblStatus)
 
 $lblPreviewTitle = New-Object System.Windows.Forms.Label
@@ -332,24 +332,19 @@ $txtPreview.BackColor = [System.Drawing.Color]::LightYellow
 $txtPreview.Anchor = "Bottom, Left, Right"
 $form.Controls.Add($txtPreview)
 
-$btnNext = New-Object System.Windows.Forms.Button
-$btnNext.Text = "Paste Next (F2)"
-$btnNext.Location = New-Object System.Drawing.Point(10, 500)
-$btnNext.Size = New-Object System.Drawing.Size(150, 40)
-$btnNext.Anchor = "Bottom, Left"
-$form.Controls.Add($btnNext)
-
-$btnBack = New-Object System.Windows.Forms.Button
-$btnBack.Text = "Paste Prev (F3)"
-$btnBack.Location = New-Object System.Drawing.Point(170, 500)
-$btnBack.Size = New-Object System.Drawing.Size(150, 40)
-$btnBack.Anchor = "Bottom, Left"
-$form.Controls.Add($btnBack)
+$lblKeys = New-Object System.Windows.Forms.Label
+$arrow = [char]0x2192
+$lblKeys.Text = "F2  $arrow  Paste Next`nF3  $arrow  Paste Prev"
+$lblKeys.Location = New-Object System.Drawing.Point(10, 500)
+$lblKeys.Size = New-Object System.Drawing.Size(310, 44)
+$lblKeys.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+$lblKeys.Anchor = "Bottom, Left"
+$form.Controls.Add($lblKeys)
 
 $lblHint = New-Object System.Windows.Forms.Label
-$lblHint.Text = "Click into the target chat box once. Then F2 = paste next prompt`nthere, F3 = paste previous prompt again. Progress auto-saves."
+$lblHint.Text = "Click into the target chat box first.`nProgress auto-saves automatically."
 $lblHint.Location = New-Object System.Drawing.Point(330, 500)
-$lblHint.Size = New-Object System.Drawing.Size(250, 50)
+$lblHint.Size = New-Object System.Drawing.Size(240, 44)
 $lblHint.Font = New-Object System.Drawing.Font("Segoe UI", 8, [System.Drawing.FontStyle]::Italic)
 $lblHint.Anchor = "Bottom, Left, Right"
 $form.Controls.Add($lblHint)
@@ -627,7 +622,7 @@ function Do-Next {
     $current = $script:prompts[$script:index]
     $delivered = Deliver-Text $current
     if (-not $delivered) {
-        $lblStatus.Text = "Prompt $($script:index) / $($script:prompts.Count) (interrupted - clear the partial paste, then press F2 to retry)"
+        $lblStatus.Text = "Prompt $($script:index) / $($script:prompts.Count) - interrupted, clear partial text & press F2"
         return
     }
     $script:index++
@@ -651,7 +646,7 @@ function Do-Back {
     $delivered = Deliver-Text $current
     if (-not $delivered) {
         $script:index++
-        $lblStatus.Text = "Prompt $($script:index) / $($script:prompts.Count) (interrupted - clear the partial paste, then press F3 to retry)"
+        $lblStatus.Text = "Prompt $($script:index) / $($script:prompts.Count) - interrupted, clear partial text & press F3"
         return
     }
     $lblStatus.Text = "Prompt $($script:index) / $($script:prompts.Count)"
@@ -674,7 +669,7 @@ function Show-Walkthrough {
         @{ Title = "Step 3: Click into the target chat box"
            Body  = "Before pressing F2 or F3, click once into the text box of the app you want the prompts delivered to (e.g. a chat window), so it has keyboard focus." },
         @{ Title = "Step 4: Deliver prompts with F2 / F3"
-           Body  = "Press F2 (or Paste Next) to deliver the next prompt into that focused box. Press F3 (or Paste Prev) to redeliver the previous one. Use Jump to # to reposition without sending anything, and Reset to start over. Progress auto-saves." }
+           Body  = "Press F2 to deliver the next prompt into that focused box. Press F3 to redeliver the previous one. Use Jump to # to reposition without sending anything, and Reset to start over. Progress auto-saves." }
     )
 
     $dlg = New-Object System.Windows.Forms.Form
@@ -784,8 +779,8 @@ function Show-AboutDialog {
         "    a line containing only ---.`n" +
         "2. Click Save to store them under a project name.`n" +
         "3. Click once into the target chat box (e.g. your AI chat app).`n" +
-        "4. Press F2 (Paste Next) to deliver the next prompt, or F3`n" +
-        "    (Paste Prev) to redeliver the previous one.`n" +
+        "4. Press F2 to deliver the next prompt, or F3 to redeliver`n" +
+        "    the previous one.`n" +
         "5. Use Jump to # to reposition without sending anything, and`n" +
         "    Reset to start the current list over from the beginning."
     $lblHowTo.Location = New-Object System.Drawing.Point(15, 132)
@@ -859,8 +854,6 @@ function Show-AboutDialog {
 
 # ---------- events ----------
 $btnStart.Add_Click({ Do-Reset })
-$btnNext.Add_Click({ Do-Next })
-$btnBack.Add_Click({ Do-Back })
 $btnJump.Add_Click({ Do-Jump ([int]$numJump.Value) })
 $lnkAbout.Add_LinkClicked({ Show-AboutDialog })
 $lnkGuide.Add_LinkClicked({ Show-Walkthrough })
