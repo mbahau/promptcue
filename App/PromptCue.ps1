@@ -148,17 +148,24 @@ function Check-ForUpdate {
     # opening. On a manual check (button in About), report the outcome either
     # way so it doesn't look like the click did nothing.
     try {
+        # raw.githubusercontent.com caches each exact URL for 5 minutes
+        # (Cache-Control: max-age=300), so right after a push this can keep
+        # returning the previous version.txt for up to 5 minutes. A unique
+        # query string per request is a different cache key, so it always
+        # gets a fresh fetch instead of a stale cached one.
+        $cacheBuster = "cb=$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
+
         # Invoke-RestMethod parses a bare numeric body like "1.3" as a
         # [decimal] instead of a string (it's valid JSON), which breaks
         # .Trim() below - force to [string] first.
-        $remoteVersion = ([string](Invoke-RestMethod -Uri $UpdateVersionUrl -TimeoutSec 5)).Trim()
+        $remoteVersion = ([string](Invoke-RestMethod -Uri "$UpdateVersionUrl`?$cacheBuster" -TimeoutSec 5)).Trim()
         if (Test-UpdateAvailable -CurrentVersion $AppVersion -RemoteVersion $remoteVersion) {
             # Notes are a nice-to-have on top of the version check above - if
             # release-notes.txt is missing or unreachable, still show the
             # plain update prompt rather than skipping the update entirely.
             $notesText = ""
             try {
-                $notes = ([string](Invoke-RestMethod -Uri $UpdateNotesUrl -TimeoutSec 5)).Trim()
+                $notes = ([string](Invoke-RestMethod -Uri "$UpdateNotesUrl`?$cacheBuster" -TimeoutSec 5)).Trim()
                 if ($notes) { $notesText = "`n`nWhat's new:`n$notes" }
             } catch { }
 
@@ -167,7 +174,7 @@ function Check-ForUpdate {
                 "PromptCue Update", "YesNo")
             if ($resp -eq "Yes") {
                 $selfPath = $PSCommandPath
-                Invoke-WebRequest -Uri $UpdateScriptUrl -OutFile $selfPath -UseBasicParsing -TimeoutSec 15
+                Invoke-WebRequest -Uri "$UpdateScriptUrl`?$cacheBuster" -OutFile $selfPath -UseBasicParsing -TimeoutSec 15
                 [System.Windows.Forms.MessageBox]::Show(
                     "Updated to $remoteVersion. Close and reopen PromptCue to use the new version.",
                     "PromptCue Update") | Out-Null
