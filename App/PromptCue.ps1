@@ -21,6 +21,9 @@ public class HotkeyForm : Form
     [DllImport("user32.dll")]
     public static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetForegroundWindow();
+
     public const int WM_HOTKEY = 0x0312;
 
     public event EventHandler NextHotkeyPressed;
@@ -510,9 +513,24 @@ function Type-Text($text) {
     # - longer "thinking" pauses every several words
     # - words are typed faster/slower depending on their length
     # - occasionally a letter is doubled and self-corrected with backspace
+    #
+    # SendInput always goes to whichever window currently has keyboard focus -
+    # it does not "lock onto" the window that was focused when typing began.
+    # If focus changes mid-simulation (alt-tab, clicking away), the remaining
+    # characters would otherwise leak into whatever now has focus, splitting
+    # the prompt across two windows. $targetWindow is captured up front and
+    # checked before every character; the moment it no longer matches, typing
+    # stops immediately with no further input sent anywhere - a partial paste
+    # into the wrong window would be worse than an incomplete one the user can
+    # see and clear. Returns $false so the caller knows not to advance the
+    # prompt counter, leaving the same prompt ready to redeliver via F2/F3.
     $script:isTyping = $true
     try {
+        $targetWindow = [HotkeyForm]::GetForegroundWindow()
         Start-Sleep -Milliseconds 150
+        if ([HotkeyForm]::GetForegroundWindow() -ne $targetWindow) {
+            return $false
+        }
 
         $tokens = [regex]::Split($text, '(\s+)')
         $wordsSinceThink = 0
@@ -523,6 +541,9 @@ function Type-Text($text) {
 
             if ($token -match '^\s+$') {
                 foreach ($ch in $token.ToCharArray()) {
+                    if ([HotkeyForm]::GetForegroundWindow() -ne $targetWindow) {
+                        return $false
+                    }
                     if ($ch -eq "`n") {
                         # Line break within the prompt: Shift+Enter inserts a
                         # newline in most chat boxes without submitting.
@@ -548,6 +569,9 @@ function Type-Text($text) {
             $typoChance = $trkTypo.Value / 100.0
 
             for ($i = 0; $i -lt $chars.Length; $i++) {
+                if ([HotkeyForm]::GetForegroundWindow() -ne $targetWindow) {
+                    return $false
+                }
                 $ch = $chars[$i]
                 [HotkeyForm]::SendUnicodeChar($ch)
                 Start-Sleep -Milliseconds ([int]((Get-KeystrokeDelay) * $factor))
@@ -565,6 +589,7 @@ function Type-Text($text) {
                 }
             }
         }
+        return $true
     } finally {
         $script:isTyping = $false
     }
@@ -583,7 +608,13 @@ function Do-Jump([int]$targetNumber) {
 }
 
 function Deliver-Text($text) {
-    if ($chkSimulateTyping.Checked) { Type-Text $text } else { Paste-Text $text }
+    # Returns $true if the prompt was fully delivered, $false if simulated
+    # typing was interrupted partway (see Type-Text) - callers must not
+    # advance the prompt counter on $false, so the same prompt stays "next
+    # up" for a clean retry via F2/F3.
+    if ($chkSimulateTyping.Checked) { return Type-Text $text }
+    Paste-Text $text
+    return $true
 }
 
 function Do-Next {
@@ -594,7 +625,11 @@ function Do-Next {
         return
     }
     $current = $script:prompts[$script:index]
-    Deliver-Text $current
+    $delivered = Deliver-Text $current
+    if (-not $delivered) {
+        $lblStatus.Text = "Prompt $($script:index) / $($script:prompts.Count) (interrupted - clear the partial paste, then press F2 to retry)"
+        return
+    }
     $script:index++
     $lblStatus.Text = "Prompt $($script:index) / $($script:prompts.Count)"
     $txtPreview.Text = $current
@@ -613,7 +648,12 @@ function Do-Back {
     }
     $script:index--
     $current = $script:prompts[$script:index - 1]
-    Deliver-Text $current
+    $delivered = Deliver-Text $current
+    if (-not $delivered) {
+        $script:index++
+        $lblStatus.Text = "Prompt $($script:index) / $($script:prompts.Count) (interrupted - clear the partial paste, then press F3 to retry)"
+        return
+    }
     $lblStatus.Text = "Prompt $($script:index) / $($script:prompts.Count)"
     $txtPreview.Text = $current
     Persist-Progress
