@@ -175,9 +175,10 @@ function Seed-ExampleProjectIfNone {
     # never overwrites or competes with anything the user has already saved.
     if ((Get-ProjectNames).Count -gt 0) { return }
     $examplePrompts = @(
-        "1. Hi! Can you introduce yourself and tell me what you can help with today?",
-        "2. Great, thanks. Now here's some background:`nWe're planning a product launch next quarter.`nPlease outline a rough timeline with 3 milestones.",
-        "3. Can you turn that into a short summary email I could send to my team?"
+        "1. Open a chat window - or just Notepad, or any text editor - where you want to test this app.",
+        "2. Press F2 to paste this next prompt into that window.",
+        "3. Press F3 to paste the previous prompt again.",
+        "4. Don't forget to minimize this app while demoing."
     )
     Save-ProjectFile -name "Example My Prompts" -prompts $examplePrompts -index 0
 }
