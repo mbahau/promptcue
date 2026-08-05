@@ -68,6 +68,21 @@ Do not reintroduce a path that updates `$script:prompts` from the textbox
 without going through Save — that was the previous design and was
 explicitly rejected.
 
+## Other past bugs worth not reintroducing
+
+- **Jump-to-# must never paste/type.** `Do-Jump` only repositions
+  `$script:index` and updates the preview box — it must not deliver the
+  prompt itself. An early version auto-delivered on jump; the user
+  explicitly wants jump to be reposition-only, with delivery happening only
+  on a subsequent F2/F3 press.
+- **Typo simulation is a per-letter check, not a per-word check.** The typo
+  slider (`$trkTypo`, 0-80%) is read as a per-character probability inside
+  the innermost character loop in `Type-Text`. An earlier version checked
+  once per eligible word (>4 letters, fixed 3% chance), which capped how
+  many typos could ever appear regardless of the slider value — at 80% it
+  still only produced "a few" typos per prompt. Keep the check per-letter so
+  the slider visibly scales chaos across the whole range.
+
 ## Naming history (so you don't reintroduce old names)
 
 - App was originally "Prompt Cycler," renamed to **PromptCue**.
